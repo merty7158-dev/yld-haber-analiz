@@ -1,108 +1,87 @@
 import streamlit as st
-from collections import Counter
-import re
+import whisper
+import tempfile
+import os
+from moviepy.editor import VideoFileClip
 
-st.set_page_config(layout="wide") 
+# --- SAYFA YAPILANDIRMASI ---
+st.set_page_config(
+    page_title="Medya Deşifre ve Metin Ayıklama Aracı", 
+    page_icon="🎙️", 
+    layout="wide"
+)
 
-# --- YAN MENÜ (SIDEBAR) AYARLARI ---
-st.sidebar.title("⚙️ Ayarlar")
-okuma_hizi = st.sidebar.slider("Spiker Okuma Hızı (Kelime/Dk)", min_value=100, max_value=180, value=130, step=10)
-st.sidebar.caption("Standart okuma hızı 130 kelime/dakikadır. Metnin coşkusuna veya spikerin tarzına göre değiştirebilirsiniz.")
+# --- YAPAY ZEKA MODELİNİ YÜKLEME ---
+# Performans için model belleğe alınır (cache)
+@st.cache_resource
+def load_whisper_model():
+    # "base" modeli hızlıdır. Daha yüksek kesinlik için "small" veya "medium" yazılabilir.
+    return whisper.load_model("base") 
 
-# --- ANA EKRAN ---
-st.title("YLD Haber - Gelişmiş Editör Masası")
-st.write("Metin analizi, özetleme, ton ölçümü, hashtag üretimi ve prompter formatı tek ekranda.")
+model = load_whisper_model()
 
-kullanici_metni = st.text_area("Haber metnini veya senaryoyu buraya yapıştırın:", height=200)
+# --- ARAYÜZ TASARIMI ---
+st.title("🎙️ Medya Deşifre Aracı")
+st.markdown("""
+Bu araç sayesinde video veya ses dosyalarındaki konuşmaları yüksek doğrulukla metne dökebilirsiniz. 
+Özellikle **röportaj deşifreleri, haber bültenleri ve içerik altyazıları** hazırlamak için optimize edilmiştir.
+""")
+st.divider()
 
-if st.button("Haber Metnini İşle"):
-    if kullanici_metni:
-        # 1. TEMEL HESAPLAMALAR
-        kelimeler = kullanici_metni.split()
-        kelime_sayisi = len(kelimeler)
-        okuma_suresi = kelime_sayisi / okuma_hizi
-        
-        # 2. VERİ TEMİZLEME VE ANAHTAR KELİMELER
-        temiz_metin = re.sub(r'[^\w\s]', '', kullanici_metni).lower()
-        tum_kelimeler = temiz_metin.split()
-        stop_words = ["ve", "veya", "ile", "için", "bir", "bu", "da", "de", "gibi", "çok", "en", "daha", "kadar", "olan", "olarak", "ise", "göre", "sonra", "önce"]
-        anlamli_kelimeler = [k for k in tum_kelimeler if k not in stop_words and len(k) > 2]
-        en_sik_kelimeler = Counter(anlamli_kelimeler).most_common(5)
-        anahtar_kelime_listesi = [kelime[0] for kelime in en_sik_kelimeler]
-        
-        # 3. ÖZETLEME VE NEFES KONTROLÜ (CÜMLE ANALİZİ)
-        cumleler = [c.strip() for c in re.split(r'[.!?]', kullanici_metni) if len(c.strip()) > 10]
-        
-        cumle_skorlari = {}
-        uzun_cumleler = [] # Nefes kontrolü için riskli cümleler listesi
-        
-        for cumle in cumleler:
-            # Özet için skorlama
-            skor = sum(1 for kelime in anahtar_kelime_listesi if kelime in cumle.lower())
-            cumle_skorlari[cumle] = skor
-            
-            # Nefes kontrolü: Cümle 20 kelimeden uzunsa listeye ekle
-            if len(cumle.split()) > 20:
-                uzun_cumleler.append(cumle)
-            
-        en_iyi_cumleler = sorted(cumle_skorlari, key=cumle_skorlari.get, reverse=True)[:2]
-        
-        # 4. DUYGU VE TON ANALİZİ
-        olumlu_havuz = ["başarı", "müjde", "harika", "yeni", "gelişim", "artış", "çözüm", "destek", "olumlu", "devrim", "kazanç", "keşif"]
-        olumsuz_havuz = ["kriz", "kaza", "sorun", "düşüş", "uyarı", "tehlike", "ölüm", "zarar", "olumsuz", "iptal", "felaket", "skandal"]
-        
-        olumlu_skor = sum(1 for k in anlamli_kelimeler if k in olumlu_havuz)
-        olumsuz_skor = sum(1 for k in anlamli_kelimeler if k in olumsuz_havuz)
-        
-        ton_durumu = "⚖️ Tarafsız (Bilgi Odaklı)"
-        if olumlu_skor > olumsuz_skor:
-            ton_durumu = "🟢 Olumlu (Müjdeli/Başarı)"
-        elif olumsuz_skor > olumlu_skor:
-            ton_durumu = "🔴 Olumsuz (Kriz/Uyarı)"
+# --- DOSYA YÜKLEME ALANI ---
+uploaded_file = st.file_uploader("İşlenecek Medya Dosyasını Yükleyin (MP4, MP3, WAV)", type=["mp4", "mp3", "wav"])
 
-        # --- EKRANA YAZDIRMA (ARAYÜZ) ---
-        st.success("Tüm Analizler Başarıyla Tamamlandı!")
+if uploaded_file is not None:
+    # Dosya uzantısını tespit et
+    file_extension = uploaded_file.name.split('.')[-1].lower()
+    
+    # Geçici dosya oluştur (İşlem bitince silinecek)
+    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_extension}") as tmp_file:
+        tmp_file.write(uploaded_file.read())
+        tmp_file_path = tmp_file.name
         
-        # Üst Panel: Temel Metrikler (3 Sütun)
-        col1, col2, col3 = st.columns(3)
-        col1.metric(label="Toplam Kelime", value=kelime_sayisi)
-        col2.metric(label="Tahmini Seslendirme", value=f"{round(okuma_suresi, 2)} Dk")
-        col3.metric(label="Haberin Tonu", value=ton_durumu)
-        
-        st.divider()
-        
-        # Orta Panel: İki Sütunlu Yapı (Sol: Editör Masası, Sağ: Sosyal Medya)
-        sol_sutun, sag_sutun = st.columns([2, 1])
-        
-        with sol_sutun:
-            st.subheader("📝 Otomatik Haber Özeti")
-            if len(en_iyi_cumleler) > 0:
-                st.info(" ... ".join(en_iyi_cumleler) + ".")
-            
-            # NEFES KONTROLÜ UYARISI
-            if len(uzun_cumleler) > 0:
-                st.warning(f"⚠️ Spiker Uyarısı: Metinde {len(uzun_cumleler)} adet çok uzun cümle var. Spiker nefes almakta zorlanabilir veya ritmi kaçırabilir.")
-                with st.expander("Uzun Cümleleri Göster (Bölmeniz Tavsiye Edilir)"):
-                    for uc in uzun_cumleler:
-                        st.write(f"- {uc}")
-            else:
-                st.success("✅ Cümle uzunlukları spiker okuması için ideal seviyede.")
-        
-        with sag_sutun:
-            st.subheader("🎯 Anahtar Kelimeler")
-            for k, s in en_sik_kelimeler:
-                st.write(f"- **{k.capitalize()}** ({s} kez)")
+    audio_path = tmp_file_path
+    
+    with st.spinner('Medya analiz ediliyor...'):
+        # Eğer yüklenen dosya video ise (MP4), önce sesi dışarı aktar
+        if file_extension == "mp4":
+            st.info("🎥 Video algılandı. Ses dosyası videodan ayrıştırılıyor...")
+            try:
+                video = VideoFileClip(tmp_file_path)
+                audio_path = tmp_file_path.replace(".mp4", ".wav")
+                video.audio.write_audiofile(audio_path, logger=None)
+                video.close()
+            except Exception as e:
+                st.error(f"Sesi ayırırken bir hata oluştu: {e}")
                 
-            st.subheader("#️⃣ Sosyal Medya Etiketleri")
-            st.caption("Kopyalayıp Instagram/YouTube açıklamasına yapıştırın.")
-            hashtags = " ".join([f"#{k}" for k in anahtar_kelime_listesi])
-            st.code(hashtags, language="text")
+        # Yapay zeka ile deşifre işlemi
+        st.info("🧠 Konuşmalar metne dökülüyor, lütfen bekleyin (dosya boyutuna göre sürebilir)...")
+        try:
+            # Dili Türkçe olarak zorlamak başarı oranını artırır
+            result = model.transcribe(audio_path, language="tr")
+            extracted_text = result["text"]
             
-        st.divider()
-        
-        # Alt Panel: Prompter
-        st.subheader("📺 Prompter Formatı")
-        st.code(kullanici_metni.upper(), language="text")
-        
-    else:
-        st.warning("Lütfen analiz etmek için bir metin girin.")
+            st.success("✅ Metin başarıyla ayıklandı!")
+            
+            # Sonucu göster
+            st.text_area("Deşifre Edilen Metin", value=extracted_text, height=300)
+            
+            # İndirme butonu
+            st.download_button(
+                label="📝 Metni Belge Olarak İndir (.txt)",
+                data=extracted_text,
+                file_name="desifre_edilmis_metin.txt",
+                mime="text/plain"
+            )
+            
+        except Exception as e:
+            st.error(f"Metin ayıklama sırasında bir hata oluştu: {e}")
+            
+    # --- TEMİZLİK ---
+    # Sunucuda yer kaplamaması için geçici dosyaları sil
+    try:
+        os.remove(tmp_file_path)
+        if file_extension == "mp4" and os.path.exists(audio_path):
+            os.remove(audio_path)
+    except:
+        pass
