@@ -52,3 +52,19 @@ if st.button("Haber Metnini İşle"):
         
     else:
         st.warning("Lütfen analiz etmek için bir metin girin.")
+
+# --- 3. CSV OLARAK İNDİRME BUTONU ---
+        st.write("---")
+        st.subheader("💾 Raporu İndir")
+        
+        # İndirilecek veriyi formatlıyoruz (Basit bir CSV yapısı)
+        csv_verisi = "Kelime,Frekans\n"
+        for kelime, sayi in en_sik_kelimeler:
+            csv_verisi += f"{kelime},{sayi}\n"
+            
+        st.download_button(
+            label="Anahtar Kelime Analizini İndir (CSV)",
+            data=csv_verisi,
+            file_name="yld_haber_analiz.csv",
+            mime="text/csv"
+        )
