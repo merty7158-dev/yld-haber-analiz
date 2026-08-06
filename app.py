@@ -25,7 +25,23 @@ if st.button("Haber Metnini İşle"):
         # 2. VERİ TEMİZLEME VE ANAHTAR KELİMELER
         temiz_metin = re.sub(r'[^\w\s]', '', kullanici_metni).lower()
         tum_kelimeler = temiz_metin.split()
-        stop_words = ["ve", "veya", "ile", "için", "bir", "bu", "da", "de", "gibi", "çok", "en", "daha", "kadar", "olan", "olarak", "ise", "göre", "sonra", "önce"]
+# 2. VERİ TEMİZLEME VE ANAHTAR KELİMELER
+        temiz_metin = re.sub(r'[^\w\s]', '', kullanici_metni).lower()
+        tum_kelimeler = temiz_metin.split()
+        
+        # Kapsamlı Türkçe Stop Words (Dolgu Kelimeleri) Listesi
+        stop_words = [
+            "ve", "veya", "ile", "için", "bir", "bu", "şu", "o", "da", "de", "ki", 
+            "gibi", "çok", "en", "daha", "kadar", "olan", "olarak", "ise", "göre", 
+            "sonra", "önce", "her", "hep", "hiç", "tüm", "bütün", "büyük", "küçük", 
+            "yeni", "eski", "iyi", "kötü", "var", "yok", "ama", "fakat", "ancak", 
+            "lakin", "çünkü", "eğer", "gerçi", "hani", "bile", "dahi", "ya", "hem",
+            "öyle", "böyle", "şöyle", "nasıl", "neden", "niçin", "ne", "kim", "hangi",
+            "bazı", "birkaç", "birçok", "hiçbir", "herkes", "kimse", "şey", "başka",
+            "üzere", "dolayı", "karşı", "rağmen", "beri", "diye", "mi", "mu", "mü"
+        ]
+        
+        anlamli_kelimeler = [k for k in tum_kelimeler if k not in stop_words and len(k) > 2]
         anlamli_kelimeler = [k for k in tum_kelimeler if k not in stop_words and len(k) > 2]
         en_sik_kelimeler = Counter(anlamli_kelimeler).most_common(5)
         anahtar_kelime_listesi = [kelime[0] for kelime in en_sik_kelimeler]
