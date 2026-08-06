@@ -53,11 +53,10 @@ if st.button("Haber Metnini İşle"):
         else:
             st.info("Metin özet çıkarmak için çok kısa.")
 
-        st.subheader("🎯 Vurgulanacak Anahtar Kelimeler")
-        # Kelimeleri yan yana şık butonlar/etiketler gibi göstermek için
-        etiketler = " | ".join([f"🔥 {kelime.capitalize()}" for kelime in anahtar_kelime_listesi])
+       st.subheader("🎯 Vurgulanacak Anahtar Kelimeler ve Frekansları")
+        # Kelimeleri ve kaç kez geçtiklerini şık bir şekilde yan yana yazdır
+        etiketler = " | ".join([f"🔥 {kelime.capitalize()} ({sayi} kez)" for kelime, sayi in en_sik_kelimeler])
         st.markdown(f"**{etiketler}**")
-
         st.divider() # Araya şık bir çizgi çeker
 
         # Alt Panel: Detaylar
