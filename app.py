@@ -2,11 +2,13 @@ import streamlit as st
 from collections import Counter
 import re
 
+# Sayfayı geniş formatta kullanalım
 st.set_page_config(layout="wide") 
 
 st.title("YLD Haber - Gelişmiş Editör Masası")
 st.write("Metin analizi, otomatik özetleme ve prompter formatı.")
 
+# Haber metnini almak için daha yüksek bir kutu
 kullanici_metni = st.text_area("Haber metnini veya senaryoyu buraya yapıştırın:", height=200)
 
 if st.button("Haber Metnini İşle"):
@@ -18,14 +20,16 @@ if st.button("Haber Metnini İşle"):
         okuma_suresi = kelime_sayisi / 130
         
         # --- 2. VERİ TEMİZLEME VE ANAHTAR KELİME ANALİZİ ---
+        # Noktalama işaretlerini sil ve tüm harfleri küçült
         temiz_metin = re.sub(r'[^\w\s]', '', kullanici_metni).lower()
         tum_kelimeler = temiz_metin.split()
         
+        # Haberde anlam ifade etmeyen bağlaçları (stop words) filtrele
         stop_words = ["ve", "veya", "ile", "için", "bir", "bu", "da", "de", "gibi", "çok", "en", "daha", "kadar", "olan", "olarak", "ise", "göre"]
         anlamli_kelimeler = [k for k in tum_kelimeler if k not in stop_words and len(k) > 2]
-        en_sik_kelimeler = Counter(anlamli_kelimeler).most_common(5)
         
-        # Sadece kelime isimlerini bir listeye alalım
+        # En sık geçen 5 kelimeyi ve sayısını bul
+        en_sik_kelimeler = Counter(anlamli_kelimeler).most_common(5)
         anahtar_kelime_listesi = [kelime[0] for kelime in en_sik_kelimeler]
 
         # --- 3. OTOMATİK ÖZETLEME VE VURGU MOTORU ---
@@ -41,7 +45,6 @@ if st.button("Haber Metnini İşle"):
         # En yüksek puanı alan (en önemli) 2 cümleyi özet olarak seçiyoruz
         en_iyi_cumleler = sorted(cumle_skorlari, key=cumle_skorlari.get, reverse=True)[:2]
         
-        
         # --- EKRANA YAZDIRMA (ARAYÜZ) ---
         st.success("Yapay Zeka Destekli Analiz Tamamlandı!")
         
@@ -53,10 +56,11 @@ if st.button("Haber Metnini İşle"):
         else:
             st.info("Metin özet çıkarmak için çok kısa.")
 
-       st.subheader("🎯 Vurgulanacak Anahtar Kelimeler ve Frekansları")
+        st.subheader("🎯 Vurgulanacak Anahtar Kelimeler ve Frekansları")
         # Kelimeleri ve kaç kez geçtiklerini şık bir şekilde yan yana yazdır
         etiketler = " | ".join([f"🔥 {kelime.capitalize()} ({sayi} kez)" for kelime, sayi in en_sik_kelimeler])
         st.markdown(f"**{etiketler}**")
+
         st.divider() # Araya şık bir çizgi çeker
 
         # Alt Panel: Detaylar
